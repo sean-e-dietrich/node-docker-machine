@@ -30,6 +30,7 @@ class Machine {
   constructor (opts) {
     opts = Machine.options(opts)
     this.name = opts.name || env.DOCKER_MACHINE_NAME || 'default'
+    this.bin = opts.bin || env.DOCKER_MACHINE_BIN || 'docker-machine'
   }
 
   static options (opts) {
@@ -38,7 +39,7 @@ class Machine {
   }
 
   static command (args, done) {
-    return cp.execFile('docker-machine', [].concat(args), {
+    return cp.execFile(this.bin, [].concat(args), {
       cwd: env.DOCKER_TOOLBOX_INSTALL_PATH || '.',
       encoding: 'utf8'
     }, done)
