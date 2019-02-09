@@ -27,38 +27,32 @@ const LIST_COLUMNS =
     'ResponseTime' ]
 
 class Machine {
-  constructor (opts) {
-    opts = Machine.options(opts)
-    this.name = opts.name || env.DOCKER_MACHINE_NAME || 'default'
-    this.bin = opts.bin || env.DOCKER_MACHINE_BIN || 'docker-machine'
+  constructor (name = 'default', bin = 'docker-machine') {
+    this.name = name;
+    this.bin = bin;
   }
 
-  static options (opts) {
-    if (typeof opts === 'string') return { name: opts }
-    else return opts || {}
-  }
-
-  static command (args, done) {
+  command (args, done) {
     return cp.execFile(this.bin, [].concat(args), {
       cwd: env.DOCKER_TOOLBOX_INSTALL_PATH || '.',
       encoding: 'utf8'
     }, done)
   }
 
-  static status (name, done) {
-    Machine.command(['status', name], (err, stdout) => {
+  status (name, done) {
+    this.command(['status', name], (err, stdout) => {
       if (err) done(err)
       else done(null, stdout.trim().toLowerCase())
     })
   }
 
-  static isRunning (name, done) {
-    Machine.status(name, (err, status) => {
+  isRunning (name, done) {
+    this.status(name, (err, status) => {
       done(err, status === 'running')
     })
   }
 
-  static create (name, driver, options, done) {
+  create (name, driver, options, done) {
     if (typeof name !== 'string' || name === '') {
       throw new TypeError('name is required')
     }
@@ -82,11 +76,11 @@ class Machine {
 
     args.push(name)
 
-    return Machine.command(args, done)
+    return this.command(args, done)
   }
 
-  static start (name, done) {
-    Machine.command(['start', name], (err) => {
+  start (name, done) {
+    this.command(['start', name], (err) => {
       if (HOST_NON_EXISTENT.test(err)) {
         done(new Error(`Docker host "${name}" does not exist`))
       } else if (ALREADY_RUNNING.test(err)) {
@@ -97,8 +91,8 @@ class Machine {
     })
   }
 
-  static stop (name, done) {
-    Machine.command(['stop', name], (err) => {
+  stop (name, done) {
+    this.command(['stop', name], (err) => {
       if (HOST_NON_EXISTENT.test(err)) {
         done(new Error(`Docker host "${name}" does not exist`))
       } else if (ALREADY_STOPPED.test(err)) {
@@ -109,8 +103,8 @@ class Machine {
     })
   }
 
-  static kill (name, done) {
-    Machine.command(['kill', name], (err) => {
+  kill (name, done) {
+    this.command(['kill', name], (err) => {
       if (HOST_NON_EXISTENT.test(err)) {
         done(new Error(`Docker host "${name}" does not exist`))
       } else if (ALREADY_STOPPED.test(err)) {
@@ -121,7 +115,7 @@ class Machine {
     })
   }
 
-  static env (name, opts, done) {
+  env (name, opts, done) {
     if (typeof opts === 'function') {
       done = opts
       opts = {}
@@ -143,7 +137,7 @@ class Machine {
 
     args.push(name)
 
-    Machine.command(args, function (err, stdout) {
+    this.command(args, function (err, stdout) {
       if (err) return done(err)
       if (!opts.parse) return done(null, stdout.trim())
 
@@ -158,7 +152,7 @@ class Machine {
     })
   }
 
-  static ssh (name, cmd, done) {
+  ssh (name, cmd, done) {
     if (Array.isArray(cmd)) {
       cmd = cmd.join(' ')
     } else if (typeof cmd !== 'string') {
@@ -168,11 +162,11 @@ class Machine {
     cmd = cmd.trim()
     if (!cmd) throw new TypeError('Command may not be empty')
 
-    Machine.command(['ssh', name, cmd], done)
+    this.command(['ssh', name, cmd], done)
   }
 
-  static inspect (name, done) {
-    Machine.command(['inspect', name], (err, stdout) => {
+  inspect (name, done) {
+    this.command(['inspect', name], (err, stdout) => {
       if (err) return done(err)
 
       try {
@@ -185,7 +179,7 @@ class Machine {
     })
   }
 
-  static list (opts, done) {
+  list (opts, done) {
     if (typeof opts === 'function') {
       done = opts
       opts = {}
@@ -206,7 +200,7 @@ class Machine {
     // to deal with docker/machine#1696.
     if (opts.timeout) args.push('-t', String(opts.timeout))
 
-    Machine.command(args, (err, stdout) => {
+    this.command(args, (err, stdout) => {
       if (err) return done(err)
 
       const machines = stdout.split(NEWLINE).filter(Boolean).map(line => {
@@ -237,7 +231,7 @@ class Machine {
 
       // Add additional metadata from `docker-machine inspect <name>`
       parallel(machines.map(machine => next => {
-        Machine.inspect(machine.name, (err, data) => {
+        this.inspect(machine.name, (err, data) => {
           if (err) next(err)
           else next(null, xtend(machine, data))
         })
@@ -245,14 +239,6 @@ class Machine {
     })
   }
 }
-
-;['status', 'isRunning', 'start', 'stop', 'kill', 'env', 'ssh', 'inspect'].forEach(method => {
-  Machine.prototype[method] = function () {
-    const args = Array.from(arguments)
-    args.unshift(this.name)
-    Machine[method].apply(null, args)
-  }
-})
 
 module.exports = Machine
 
